@@ -1,0 +1,137 @@
+Từng bước lập trình chương trình nhận dạng tiếng nói tiếng việt
+Trong các bài trước chúng ta đã thực hiện:
++ Xây dựng mô hình ngôn ngữ
++ Xây dựng mô hình ngữ âm
++ Xây dựng demo chương trình nhận dạng sử dụng mô hình ngôn ngữ và mô hình ngữ âm
+
+Hôm nay chúng ta sẽ đi vào phần source code, phần này sẽ sử dụng thư viện API của pocketsphinx để viết một chương trình nhận dạng tiếng nói với ngôn ngữ lập trình c trên linux. đây là chương trình cơ bản dạng hello world của thế giới nhận dạng tiếng nói Tiếng Việt, nắm rõ cách hoạt động của chương trình này chúng ta sẽ dễ dàng phát triển chương trình lớn hơn cho những bài toán nhận dạng tiếng nói Tiếng Việt cụ thể của mình.
+
+Các bước để lập trình chương trình phần mềm được trình bày từng bước cụ thể như dưới đây:
+
+1. Download gói thư viện và source code của chương trình nhận dạng.
+Download tại đây
+Sau khi download về máy tính thực hiện giải nén và chép toàn bộ vào thư mục /opt trên hệ điều hành linux chúng ta sẽ thấy như sau:
+--opt
+------laptrinhnhandang
+----------nhandangtiengviet_bin
+----------nhandangtiengviet_source
+----------pocketsphinx-0.8.tar.gz
+----------sphinxbase-0.8.tar.gz
+=>Kết thúc giai đoạn này là chúng ta có các thư mục và tập tin như trên để sẵn sàng cho quá trình lập trình.
+
+2. Các bước xây dựng thư viện API pocketsphinx trên linux CentOS
+Từ dấu nhắc lệnh của linũ tiến hành thực hiện các lệnh như sau
+# cd /opt/laptrinhnhandang
+# tar zxvf sphinxbase-0.8.tar.gz
+# tar zxvf pocketsphinx-0.8.tar.gz
+
+# cd /home/viethuong/Desktop/laptrinhnhandang/sphinxbase-0.8; make clean;./configure --prefix=/home/viethuong/Desktop/laptrinhnhandang/sphinx;make install
+# cd /opt/laptrinhnhandang/pocketsphinx-0.8;make clean;./configure --prefix=/opt/laptrinhnhandang/sphinx;make install
+
+
+# echo "/opt/laptrinhnhandang/sphinx/lib/" > /etc/ld.so.conf.d/sphinx.conf
+# ldconfig
+# cp -r /opt/laptrinhnhandang/sphinx/include/sphinxbase /opt/laptrinhnhandang/sphinx/include/pocketsphinx
+=> Kết thúc phần này chúng ta đã có thư viện API của pocketsphinx để sẵn sàng cho việc lập trình.
+
+3. Viết chương trình nhận dạng tiếng nói Tiếng Việt
+vào thư mục /opt/laptrinhnhandang/nhandangtiengviet_source
+# cd /opt/laptrinhnhandang/nhandangtiengviet_source
+Mở tập tin nhandang.c để xem nội dung của chương trình.
+Hàm nhận dạng tiếng nói từ tập tin âm thanh dạng file wav
+int nhandangtaptin(char* tentaptin)
+{
+	FILE *fh;
+	char const *hyp, *uttid;
+    int16 buf[512];
+	int rv;
+	int32 score;
+
+	// Nap thong so cau hinh he thong nhan dang 
+    cmd_ln_t *cmdln = cmd_ln_init(NULL, cont_args_def, TRUE,
+                             "-hmm", "hmm",
+                             "-lm", "huanluyen_diadiem.lm.DMP",
+                             "-dict", "huanluyen_diadiem.dic",
+							 "-samprate", "8000",
+							 "-frate", "50",
+							 "-silprob", "0.005",
+							 "-bestpath", "yes",
+                             NULL);
+    //Kiem tra xem co nap thanh cong hay khong?
+	if(cmdln == NULL)
+	{
+		printf("Nap cau hinh khong thanh cong\n");
+		return 1;
+	}
+
+	//khoi tao he thong nhan dang va kiem tra viec khoi tao
+	ps_decoder_t *ps = ps_init(cmdln);
+	if(ps == NULL)
+	{
+		printf("Khong the khoi tao he thong nhan dang.\n");
+		return 1;
+	}
+	
+	//Mo tap tin can nhan dang
+	fh = fopen(tentaptin, "rb");
+	if (fh == NULL) {
+		printf("Loi mo tap tin %s\n",tentaptin);
+		return 1;
+	}
+
+	//Tien 	hanh nhan dang
+	rv = ps_decode_raw(ps, fh, "tentaptin", -1);
+	if (rv < 0)
+		return 1;
+	hyp = ps_get_hyp(ps, &score, &uttid);
+	if (hyp == NULL)
+		return 1;
+	printf("Ket qua nhan dang: %s\n", hyp);
+
+	//giai phong vung nho	
+	fclose(fh);
+	ps_free(ps);
+	return 0;
+} 
+
+Hàm chính cho việc nhận dạng.
+int main(int argc, char *argv[])
+{
+	ARGC = argc;
+	ARGV = argv;
+	char * tentaptin;
+  
+	if(ARGC < 2)
+	{
+		printf("Su dung: %s ten_tap_tin_am_thanh_can_nhan_dang\n", argv[0]);
+		return 0;
+	}
+	tentaptin = argv[1];
+	printf("ten tap tin can nhan dang %s\n",tentaptin);
+	nhandangtaptin(tentaptin);
+	
+	return 0;
+}
+
+Biên dịch chương trình trên thực hiện lệnh như sau:
+# cd /opt/laptrinhnhandang/nhandangtiengviet_source;CPPFLAGS="-I/opt/sphinx/include/sphinxbase -I/opt/sphinx/include/pocketsphinx" LDFLAGS=-L/opt/sphinx/lib sh ./configure --prefix=/opt/laptrinhnhandang/nhandangtiengviet_bin;make install
+
+=> sau khi biên dịch xong chúng ta có tập tin  nhandang tại thư mục /opt/laptrinhnhandang/nhandangtiengviet_bin/bin thì xem như công đoạn biên dịch đã thành công.
+
+4. Chạy chương trình để xem kết quả
+sau khi đã biên dịch chương trình chúng ta xem kết quả nhận dạng đúng không?, chạy chương trình để xem kết quả
+# cd /opt/laptrinhnhandang/nhandangtiengviet_bin/bin
+# chmod 775 nhandang
+# ./nhandang CAFPHEE001.wav
+Chúng ta thấy kết quả như sau:
+INFO: ngram_search.c(888): bestpath -0.00 CPU -0.000 xRT
+INFO: ngram_search.c(891): bestpath 0.00 wall 0.000 xRT
+Ket qua nhan dang: CAF PHEE -> Đây chính là kết quả chúng ta thu được
+
+Bạn thử nhận dạng các tập tin khác như sau:
+# ./nhandang KARAOKE001.wav
+# ./nhandang KHASCHSAJN001.wav
+# ./nhandang MASTXA001.wav
+# ./nhandang TRAJMAYTEEM001.wav
+Chúc Bạn Thành Công.
+Alovoice.vn - Lê Quốc Toàn.
